@@ -51,7 +51,6 @@ const genLimiter = rateLimit({
   message: { error: "Generation limit reached for this hour. Upgrade to VIP for unlimited access." },
 });
 
-// Hard cap: max 3 new accounts per IP address per 24 hours (in-memory layer)
 const registerLimiter = rateLimit({
   windowMs: 24 * 60 * 60 * 1000,
   max: Number(process.env.MAX_REGISTRATIONS_PER_IP ?? "3"),
@@ -82,12 +81,11 @@ app.use(cookieParser());
 
 app.use("/api", router);
 
-// In production, serve the built React frontend and handle client-side routing
 if (process.env.NODE_ENV === "production") {
   const frontendDist = path.resolve(__dirname, "../../vidcraft-ai/dist/public");
   if (existsSync(frontendDist)) {
     app.use(express.static(frontendDist));
-    app.get("*", (_req, res) => {
+    app.get("*splat", (_req, res) => {
       res.sendFile(path.join(frontendDist, "index.html"));
     });
   } else {

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from 'wouter';
-import { Coins, Video, Zap, Crown, TrendingUp, Gift, ArrowRight, Sparkles, Clock, Users, Copy, Check, Heart } from 'lucide-react';
+import { Coins, Video, Zap, Crown, TrendingUp, Gift, ArrowRight, Sparkles, Clock, Users, Copy, Check, Heart, Loader2, Share2 } from 'lucide-react';
 import { getVideoStats, getReferralInfo } from '@/lib/api-client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -186,37 +186,59 @@ export default function DashboardPage() {
           </div>
 
           <div className="glass-morphism rounded-2xl p-6 border border-white/10">
-            <div className="flex items-center gap-2 mb-1">
-              <Users className="w-4 h-4 text-accent" />
-              <h3 className="font-bold text-sm uppercase tracking-wider">Referral Program</h3>
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-accent" />
+                <h3 className="font-bold text-sm uppercase tracking-wider">Referral Program</h3>
+              </div>
+              {referral && (
+                <span className="text-[11px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                  +{referral.creditsEarned} earned
+                </span>
+              )}
             </div>
             <p className="text-xs text-muted-foreground mb-4">
-              Share your link and earn <span className="text-white font-semibold">2 credits</span> for every friend who signs up.
+              Earn <span className="text-white font-semibold">2 credits</span> for every friend who signs up. Your friend gets <span className="text-white font-semibold">1 bonus credit</span> too.
             </p>
             {referral ? (
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-mono text-white/60 truncate">
+                  <div className="flex-1 px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs font-mono text-white/50 truncate select-all cursor-text">
                     {referralLink}
                   </div>
                   <button onClick={copyReferralLink}
-                    className="shrink-0 w-9 h-9 flex items-center justify-center rounded-xl bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-colors">
+                    className="shrink-0 w-9 h-9 flex items-center justify-center rounded-xl bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-all active:scale-95">
                     {copiedRef ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                   </button>
                 </div>
-                <div className="grid grid-cols-2 gap-3 text-center">
-                  <div className="px-3 py-2 rounded-xl bg-white/5 border border-white/10">
-                    <p className="text-xl font-bold text-white">{referral.referralCount}</p>
-                    <p className="text-[11px] text-muted-foreground">Friends referred</p>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`🎬 Try VidCraft AI — generate stunning videos with AI in seconds!\n\nUse my link to get a bonus credit: ${referralLink}`)}`, '_blank')}
+                    className="flex items-center justify-center gap-2 py-2 rounded-xl bg-[#25D366]/10 border border-[#25D366]/20 text-[#25D366] text-xs font-semibold hover:bg-[#25D366]/20 transition-all active:scale-95">
+                    <Share2 className="w-3.5 h-3.5" /> WhatsApp
+                  </button>
+                  <button
+                    onClick={() => window.open(`https://x.com/intent/tweet?text=${encodeURIComponent(`🎬 Generate AI videos in seconds with VidCraft AI!\n\nSign up with my link and get a bonus credit:`)}&url=${encodeURIComponent(referralLink)}`, '_blank')}
+                    className="flex items-center justify-center gap-2 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-semibold hover:bg-white/10 transition-all active:scale-95">
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.259 5.629L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                    Post on X
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-center pt-1">
+                  <div className="px-3 py-2.5 rounded-xl bg-white/5 border border-white/10">
+                    <p className="text-2xl font-bold text-white">{referral.referralCount}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Friends referred</p>
                   </div>
-                  <div className="px-3 py-2 rounded-xl bg-white/5 border border-white/10">
-                    <p className="text-xl font-bold text-primary">{referral.creditsEarned}</p>
-                    <p className="text-[11px] text-muted-foreground">Credits earned</p>
+                  <div className="px-3 py-2.5 rounded-xl bg-primary/5 border border-primary/20">
+                    <p className="text-2xl font-bold text-primary">{referral.creditsEarned}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Credits earned</p>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-center py-4">
+              <div className="flex items-center justify-center py-6">
                 <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
               </div>
             )}

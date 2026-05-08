@@ -66,9 +66,6 @@ catalogs:
     vite:
       specifier: ^7.3.2
       version: 7.3.2
-    wouter:
-      specifier: ^3.9.0
-      version: 3.9.0
     zod:
       specifier: ^3.25.76
       version: 3.25.76
@@ -184,6 +181,9 @@ importers:
       cors:
         specifier: ^2
         version: 2.8.6
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@types/pg@8.18.0)(pg@8.20.0)
@@ -193,9 +193,6 @@ importers:
       express-rate-limit:
         specifier: ^8.5.1
         version: 8.5.1(express@5.2.1)
-      express-slow-down:
-        specifier: ^3.1.0
-        version: 3.1.0(express@5.2.1)
       helmet:
         specifier: ^8.1.0
         version: 8.1.0
@@ -612,7 +609,7 @@ importers:
         specifier: 'catalog:'
         version: 7.3.2(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2)
       wouter:
-        specifier: 'catalog:'
+        specifier: ^3.3.5
         version: 3.9.0(react@19.1.0)
       zod:
         specifier: 'catalog:'
@@ -2005,6 +2002,10 @@ packages:
   dom-helpers@5.2.1:
     resolution: {integrity: sha512-nRCa7CK3VTrM2NmGkIy4cbK7IZlgBE/PYMn55rrXefr5xXDP0LdtfPnblFDoVdcAfslJ7or6iqAUnx0CCGIWQA==}
 
+  dotenv@17.4.2:
+    resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
+    engines: {node: '>=12'}
+
   drizzle-kit@0.31.9:
     resolution: {integrity: sha512-GViD3IgsXn7trFyBUUHyTFBpH/FsHTxYJ66qdbVggxef4UBPHRYxQaRzYLTuekYnk9i5FIEL9pbBIwMqX/Uwrg==}
     hasBin: true
@@ -2214,12 +2215,6 @@ packages:
     engines: {node: '>= 16'}
     peerDependencies:
       express: '>= 4.11'
-
-  express-slow-down@3.1.0:
-    resolution: {integrity: sha512-0gZ1HHow8H83z1/+81DdWB60RSGHI0mJB0ZM1m5P6/BexORFcA8P1TgU0NKEwOiRmxyCIoktZYqmA+1UCc83+A==}
-    engines: {node: '>= 16'}
-    peerDependencies:
-      express: 4 || 5 || ^5.0.0-beta.1
 
   express@5.2.1:
     resolution: {integrity: sha512-hIS4idWWai69NezIdRt2xFVofaF4j+6INOpJlVOLDO8zXGpUVEVzIYk12UUi2JzjEzWL3IOAxcTubgz9Po0yXw==}
@@ -4834,6 +4829,8 @@ snapshots:
       '@babel/runtime': 7.28.6
       csstype: 3.2.3
 
+  dotenv@17.4.2: {}
+
   drizzle-kit@0.31.9:
     dependencies:
       '@drizzle-team/brocli': 0.10.2
@@ -4953,11 +4950,6 @@ snapshots:
     dependencies:
       express: 5.2.1
       ip-address: 10.2.0
-
-  express-slow-down@3.1.0(express@5.2.1):
-    dependencies:
-      express: 5.2.1
-      express-rate-limit: 8.5.1(express@5.2.1)
 
   express@5.2.1:
     dependencies:

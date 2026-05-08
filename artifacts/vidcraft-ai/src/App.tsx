@@ -14,6 +14,7 @@ import HistoryPage from "@/pages/HistoryPage";
 import SettingsPage from "@/pages/SettingsPage";
 import ContactPage from "@/pages/ContactPage";
 import TermsPage from "@/pages/TermsPage";
+import AdminPage from "@/pages/AdminPage";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -39,6 +40,7 @@ function AppRoutes() {
       <Route path="/settings" component={SettingsPage} />
       <Route path="/contact" component={ContactPage} />
       <Route path="/terms" component={TermsPage} />
+      <Route path="/admin" component={AdminPage} />
       <Route component={NotFound} />
     </Switch>
   );

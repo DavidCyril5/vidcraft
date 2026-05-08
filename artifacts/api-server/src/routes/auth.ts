@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import bcryptjs from "bcryptjs";
 import { User } from "../models/User";
 import { requireAuth, type AuthRequest } from "../middleware/auth";
+import { isIpRegistrationBlocked, recordIpRegistration } from "../models/RegistrationAttempt";
 
 const router = Router();
 
@@ -31,12 +32,24 @@ router.post("/register", async (req: Request, res: Response) => {
       res.status(400).json({ error: "Password must be at least 6 characters." });
       return;
     }
+
+    // MongoDB-backed IP check — persists across server restarts
+    const clientIp = req.ip ?? req.socket.remoteAddress ?? "unknown";
+    const blocked = await isIpRegistrationBlocked(clientIp);
+    if (blocked) {
+      res.status(429).json({
+        error: "Too many accounts have been created from your connection today. Please try again tomorrow or contact support if you think this is a mistake.",
+      });
+      return;
+    }
+
     const existing = await User.findOne({ email });
     if (existing) {
       res.status(400).json({ error: "An account with this email already exists." });
       return;
     }
     const user = await User.create({ name, email, password, credits: 3 });
+    await recordIpRegistration(clientIp);
 
     if (referralCode && typeof referralCode === "string") {
       const referrer = await User.findOne({ referralCode: referralCode.toUpperCase() });
@@ -51,7 +64,7 @@ router.post("/register", async (req: Request, res: Response) => {
     setCookie(res, token);
     res.json({
       token,
-      user: { id: user._id, name: user.name, email: user.email, plan: user.plan, credits: user.credits },
+      user: { id: user._id, name: user.name, email: user.email, plan: user.plan, credits: user.credits, isAdmin: user.isAdmin },
     });
   } catch {
     res.status(500).json({ error: "Something went wrong. Please try again." });
@@ -74,7 +87,7 @@ router.post("/login", async (req: Request, res: Response) => {
     setCookie(res, token);
     res.json({
       token,
-      user: { id: user._id, name: user.name, email: user.email, plan: user.plan, credits: user.credits },
+      user: { id: user._id, name: user.name, email: user.email, plan: user.plan, credits: user.credits, isAdmin: user.isAdmin },
     });
   } catch {
     res.status(500).json({ error: "Something went wrong. Please try again." });
@@ -90,7 +103,7 @@ router.get("/me", requireAuth, async (req: AuthRequest, res: Response) => {
   const u = req.user;
   res.json({
     id: u._id, name: u.name, email: u.email, plan: u.plan, credits: u.credits,
-    dailyWanClaimed: u.dailyWanClaimed, referralCode: u.referralCode, referralCount: u.referralCount,
+    isAdmin: u.isAdmin, dailyWanClaimed: u.dailyWanClaimed, referralCode: u.referralCode, referralCount: u.referralCount,
   });
 });
 

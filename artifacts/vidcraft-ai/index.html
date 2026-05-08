@@ -13,30 +13,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <div id="devtools-overlay" style="display:none;position:fixed;inset:0;z-index:999999;background:#0d0a12;align-items:center;justify-content:center;flex-direction:column;gap:16px;color:#fff;font-family:sans-serif;">
-      <div style="font-size:48px">🔒</div>
-      <h2 style="color:#C999FF;font-size:24px;margin:0">Access Restricted</h2>
-      <p style="color:#888;margin:0;text-align:center;max-width:320px">Developer tools are not permitted on this platform.</p>
-    </div>
     <script type="module" src="/src/main.tsx"></script>
-    <script>
-      (function() {
-        document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
-        document.addEventListener('keydown', function(e) {
-          if (
-            e.key === 'F12' ||
-            (e.ctrlKey && e.shiftKey && ['I','J','C','U'].includes(e.key)) ||
-            (e.metaKey && e.altKey && ['I','J','C','U'].includes(e.key)) ||
-            (e.ctrlKey && e.key === 'U')
-          ) { e.preventDefault(); return false; }
-        });
-        var overlay = document.getElementById('devtools-overlay');
-        var threshold = 200;
-        setInterval(function() {
-          var open = window.outerWidth - window.innerWidth > threshold || window.outerHeight - window.innerHeight > threshold;
-          if (overlay) overlay.style.display = open ? 'flex' : 'none';
-        }, 1000);
-      })();
-    </script>
   </body>
 </html>

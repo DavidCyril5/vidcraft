@@ -1,5 +1,4 @@
-# Firebase Studio
+This is a pnpm monorepo with two deployable services. Here's what you need for Render:
 
-This is a NextJS starter in Firebase Studio.
-
-To get started, take a look at src/app/page.tsx.
+🖥️ API Server (artifacts/api-server)
+CommandBuildpnpm install && pnpm --filter @workspace/api-server run buildStartnode --enable-source-maps artifacts/api-server/dist/index.mjs

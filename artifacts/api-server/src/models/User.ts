@@ -8,6 +8,7 @@ export interface IUser {
   password: string;
   plan: "free" | "starter" | "pro" | "vip";
   credits: number;
+  isAdmin: boolean;
   dailyWanClaimed: string | null;
   referralCode: string;
   referredBy: string | null;
@@ -21,6 +22,7 @@ const userSchema = new mongoose.Schema<IUser>({
   password: { type: String, required: true },
   plan: { type: String, enum: ["free", "starter", "pro", "vip"], default: "free" },
   credits: { type: Number, default: 3 },
+  isAdmin: { type: Boolean, default: false },
   dailyWanClaimed: { type: String, default: null },
   referralCode: { type: String, unique: true, sparse: true },
   referredBy: { type: String, default: null },

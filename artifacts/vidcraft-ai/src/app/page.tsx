@@ -1,184 +1,189 @@
-import React, { useState, useEffect } from 'react';
-import { Play, RotateCcw, Download, MonitorOff, Loader2, Share2, Check, Clock } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { downloadVideo } from '@/lib/api-client';
+import React, { useState } from 'react';
+import Navbar from '@/components/Navbar';
+import GenerationForm from '@/components/GenerationForm';
+import VideoDisplay from '@/components/VideoDisplay';
+import { useAuth } from '@/contexts/AuthContext';
+import { Sparkles, Zap, Shield, PlayCircle, Video as LucideVideo, Crown, Pen, Cpu, Download } from 'lucide-react';
 
-interface VideoDisplayProps {
-  status: 'idle' | 'generating' | 'completed' | 'error';
-  videoUrl?: string;
-  prompt?: string;
-  onReset: () => void;
-  waitMins?: number;
-}
+export default function Home() {
+  const [genStatus, setGenStatus] = useState<'idle' | 'generating' | 'completed' | 'error'>('idle');
+  const [currentVideoUrl, setCurrentVideoUrl] = useState<string | undefined>();
+  const [lastPrompt, setLastPrompt] = useState<string | undefined>();
+  const [waitMins, setWaitMins] = useState<number>(5);
+  const { user } = useAuth();
 
+  const MODEL_WAIT: Record<string, number> = {
+    'wan-2.2': 4, 'veo-3.1': 7, 'grok-video': 5, 'seedance-2.0': 10,
+  };
 
-function CountdownTimer({ active, totalSeconds }: { active: boolean; totalSeconds: number }) {
-  const [elapsed, setElapsed] = useState(0);
+  const handleGenerateStart = (values: any) => {
+    setGenStatus('generating');
+    setLastPrompt(values.prompt);
+    setCurrentVideoUrl(undefined);
+    setWaitMins(MODEL_WAIT[values.model] ?? 5);
+  };
 
-  useEffect(() => {
-    if (!active) { setElapsed(0); return; }
-    const id = setInterval(() => setElapsed(e => e + 1), 1000);
-    return () => clearInterval(id);
-  }, [active]);
+  const handleGenerateComplete = (videoUrl: string) => {
+    setCurrentVideoUrl(videoUrl);
+    setGenStatus('completed');
+  };
 
-  const remaining = Math.max(0, totalSeconds - elapsed);
-  const mins = Math.floor(remaining / 60);
-  const secs = remaining % 60;
-  const pct = Math.min(100, (elapsed / totalSeconds) * 100);
+  const handleGenerateError = () => setGenStatus('error');
 
-  const phase = elapsed < totalSeconds * 0.7
-    ? 'Initialising neural render...'
-    : elapsed < totalSeconds * 0.9
-    ? 'Finalising your video...'
-    : 'Almost there, polishing frames...';
+  const handleReset = () => {
+    setGenStatus('idle');
+    setCurrentVideoUrl(undefined);
+    setLastPrompt(undefined);
+  };
 
   return (
-    <div className="space-y-3 text-center w-full max-w-sm">
-      <div className="relative h-2 w-full bg-white/5 rounded-full overflow-hidden">
-        <div
-          className="absolute left-0 top-0 h-full primary-gradient rounded-full transition-all duration-1000"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <div className="flex items-center justify-between text-[11px] text-muted-foreground px-1">
-        <span className="animate-pulse">{phase}</span>
-        {remaining > 0 ? (
-          <span className="flex items-center gap-1 font-mono font-bold text-white/60">
-            <Clock className="w-3 h-3" />{mins}:{secs.toString().padStart(2, '0')}
-          </span>
-        ) : (
-          <span className="text-primary font-semibold">Checking result...</span>
+    <div className="min-h-screen flex flex-col relative overflow-hidden bg-background pb-16">
+      <div className="absolute top-[-10%] left-[-10%] w-[60%] md:w-[40%] h-[40%] bg-primary/15 blur-[120px] md:blur-[160px] pointer-events-none rounded-full" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[60%] md:w-[40%] h-[40%] bg-accent/15 blur-[120px] md:blur-[160px] pointer-events-none rounded-full" />
+
+      <Navbar />
+
+      <main className="flex-grow container mx-auto px-4 py-8 md:py-16 relative z-10 max-w-7xl">
+        <header className="text-center mb-10 md:mb-16 space-y-5 px-2">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-[10px] md:text-xs font-semibold tracking-wider text-primary uppercase">
+            <Sparkles className="w-3.5 h-3.5" />Next-Gen AI Video Engine
+          </div>
+          <h1 className="text-5xl md:text-8xl font-bold font-headline tracking-tight text-white leading-[1.05]">
+            Dream in <span className="text-gradient">Motion</span>
+          </h1>
+          <p className="text-base md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+            VidCraft AI transforms your ideas into cinematic realities with advanced neural models — Veo 3.1, Wan 2.2, Grok Video, and Seedance 2.0.
+          </p>
+          {!user && (
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+              <a href="/signup" className="h-12 px-8 primary-gradient text-background font-bold rounded-2xl shadow-lg shadow-primary/20 hover:scale-105 transition-all flex items-center gap-2 text-sm">
+                <Sparkles className="w-4 h-4" />Start Free — 3 Credits
+              </a>
+              <a href="/pricing" className="h-12 px-6 rounded-2xl bg-white/5 border border-white/10 text-sm font-medium hover:bg-white/10 transition-all flex items-center gap-2">
+                <Crown className="w-4 h-4 text-yellow-400" />View Plans
+              </a>
+            </div>
+          )}
+        </header>
+
+        {!user && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
+            {[
+              { icon: Pen, num: '01', title: 'Write a Prompt', desc: 'Describe your scene in plain English. Use our AI enhancer or pick from prompt templates to get the perfect idea.' },
+              { icon: Cpu, num: '02', title: 'Choose a Model', desc: 'Pick from 4 world-class AI models. Wan 2.2 is free. Veo 3.1, Grok Video, and Seedance 2.0 on paid plans.' },
+              { icon: Download, num: '03', title: 'Download & Share', desc: 'Your video is ready in 3–6 minutes. Download as MP4, share the link, or save to your video history.' },
+            ].map(step => (
+              <div key={step.num} className="glass-morphism rounded-2xl p-6 border border-white/8 flex gap-4">
+                <div className="shrink-0">
+                  <div className="w-10 h-10 rounded-xl primary-gradient flex items-center justify-center">
+                    <step.icon className="w-4 h-4 text-background" />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold tracking-[0.2em] text-muted-foreground uppercase mb-1">Step {step.num}</p>
+                  <h3 className="font-bold text-white mb-1">{step.title}</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{step.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
-      </div>
-      <p className="text-xs text-muted-foreground">This typically takes ~{Math.round(totalSeconds / 60)} minute{totalSeconds >= 120 ? 's' : ''}. You can leave this tab open.</p>
-    </div>
-  );
-}
 
-export default function VideoDisplay({ status, videoUrl, prompt, onReset, waitMins = 5 }: VideoDisplayProps) {
-  const [downloading, setDownloading] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const { toast } = useToast();
-
-  const handleDownload = async () => {
-    if (!videoUrl) return;
-    setDownloading(true);
-    try {
-      await downloadVideo(videoUrl, prompt || 'video');
-      toast({ title: 'Download started!', description: 'Your video is being saved.' });
-    } catch (err: any) {
-      toast({ title: 'Download failed', description: err.message, variant: 'destructive' });
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  const handleShare = async () => {
-    if (!videoUrl) return;
-    try {
-      await navigator.clipboard.writeText(videoUrl);
-      setCopied(true);
-      toast({ title: 'Link copied!', description: 'Share your video with anyone.' });
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast({ title: 'Could not copy link', variant: 'destructive' });
-    }
-  };
-
-  if (status === 'idle') {
-    return (
-      <div className="glass-morphism border-dashed border-2 border-white/5 bg-transparent min-h-[300px] md:h-[420px] flex flex-col items-center justify-center p-8 text-center rounded-3xl">
-        <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-6">
-          <Play className="w-8 h-8 text-white/20" />
-        </div>
-        <h3 className="text-xl font-headline mb-2 text-white/40">Ready to Create?</h3>
-        <p className="text-sm text-muted-foreground max-w-xs">
-          Describe your vision and let our AI models bring it to life.
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="glass-morphism overflow-hidden border border-white/10 shadow-2xl rounded-3xl lg:sticky lg:top-24">
-      <div className="relative aspect-video bg-black/40 flex items-center justify-center overflow-hidden">
-        {status === 'generating' ? (
-          <div className="flex flex-col items-center gap-6 p-8 w-full">
-            <div className="relative">
-              <div className="absolute inset-0 primary-gradient blur-3xl opacity-20 animate-pulse rounded-2xl" />
-              <div className="w-20 h-20 rounded-2xl primary-gradient flex items-center justify-center relative z-10 shadow-2xl shadow-primary/40">
-                <Loader2 className="w-10 h-10 text-background animate-spin" />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+          <div className="lg:col-span-5 space-y-6">
+            <GenerationForm
+              onGenerateStart={handleGenerateStart}
+              onGenerateComplete={handleGenerateComplete}
+              onGenerateError={handleGenerateError}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-5 rounded-2xl glass-morphism space-y-2 border border-white/5">
+                <Zap className="w-5 h-5 text-primary" />
+                <h4 className="font-bold text-sm">4 AI Models</h4>
+                <p className="text-xs text-muted-foreground leading-relaxed">Veo 3.1, Wan 2.2, Grok Video, Seedance 2.0.</p>
+              </div>
+              <div className="p-5 rounded-2xl glass-morphism space-y-2 border border-white/5">
+                <Shield className="w-5 h-5 text-accent" />
+                <h4 className="font-bold text-sm">HD Fidelity</h4>
+                <p className="text-xs text-muted-foreground leading-relaxed">Studio quality output by default.</p>
               </div>
             </div>
-            <p className="text-lg font-headline">Crafting your masterpiece...</p>
-            <CountdownTimer active={status === 'generating'} totalSeconds={waitMins * 60} />
           </div>
-        ) : status === 'completed' && videoUrl ? (
-          <video
-            src={
-              videoUrl.includes('freeaivideos.org')
-                ? `${import.meta.env.BASE_URL.replace(/\/$/, '')}/api/ai/proxy-video?url=${encodeURIComponent(videoUrl)}`
-                : videoUrl
-            }
-            className="w-full h-full object-contain"
-            controls autoPlay loop playsInline
-          />
-        ) : status === 'error' ? (
-          <div className="flex flex-col items-center gap-4 text-center p-8">
-            <div className="p-4 rounded-full bg-red-500/10">
-              <MonitorOff className="w-10 h-10 text-red-400" />
-            </div>
-            <h3 className="text-xl font-headline">Generation stopped</h3>
-            <p className="text-sm text-muted-foreground max-w-xs">Check the message above and try again. Your credit has been refunded.</p>
-            <button onClick={onReset} className="mt-2 px-5 py-2 rounded-xl bg-white/10 border border-white/10 text-sm hover:bg-white/15 transition-colors">
-              Try Again
-            </button>
-          </div>
-        ) : null}
-      </div>
 
-      <div className="p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-accent/80 px-2.5 py-1 rounded-lg bg-accent/10 border border-accent/20">
-            {status === 'completed' ? 'AI Generated' : status === 'generating' ? 'Processing...' : 'AI Generated'}
-          </span>
-          <div className="flex gap-2">
-            <button
-              onClick={handleShare}
-              disabled={status !== 'completed'}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-medium hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-              title="Copy video link"
-            >
-              {copied ? <><Check className="w-3.5 h-3.5 text-green-400" />Copied!</> : <><Share2 className="w-3.5 h-3.5" />Share</>}
-            </button>
-            <button
-              onClick={handleDownload}
-              disabled={status !== 'completed' || downloading}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-medium hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-            >
-              {downloading ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Saving...</> : <><Download className="w-3.5 h-3.5" />Download</>}
-            </button>
+          <div className="lg:col-span-7">
+            <VideoDisplay
+              status={genStatus}
+              videoUrl={currentVideoUrl}
+              prompt={lastPrompt}
+              onReset={handleReset}
+              waitMins={waitMins}
+            />
+            <div className="mt-6 p-6 rounded-3xl glass-morphism flex flex-col sm:flex-row items-center gap-5 border border-white/5">
+              <div className="flex -space-x-3">
+                {[1, 2, 3, 4].map(i => (
+                  <div key={i} className="w-10 h-10 rounded-full border-2 border-background overflow-hidden ring-2 ring-white/5">
+                    <img src={`https://picsum.photos/seed/user${i}/100/100`} alt="" className="w-full h-full object-cover" />
+                  </div>
+                ))}
+              </div>
+              <div className="text-center sm:text-left flex-grow">
+                <p className="text-sm font-semibold">Join <span className="text-primary">2,500+</span> creators</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Producing thousands of videos daily.</p>
+              </div>
+              <a href="/pricing" className="text-xs font-bold flex items-center gap-2 text-primary hover:text-primary/80 transition-all px-4 py-2 rounded-xl bg-primary/5 border border-primary/10 shrink-0">
+                <PlayCircle className="w-4 h-4" />See Plans
+              </a>
+            </div>
           </div>
         </div>
+      </main>
 
-        {prompt && (
-          <div className="space-y-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Prompt</p>
-            <p className="text-xs text-white/70 line-clamp-2 italic">"{prompt}"</p>
+      <footer className="border-t border-white/5 py-12 bg-background/50 backdrop-blur-xl relative z-10">
+        <div className="container mx-auto px-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-10">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 primary-gradient rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
+                <LucideVideo className="w-4 h-4 text-background" />
+              </div>
+              <span className="text-xl font-headline font-bold text-gradient">VidCraft AI</span>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Leading the revolution in AI-powered visual storytelling. Made in Nigeria.
+            </p>
           </div>
-        )}
-
-        {status === 'completed' && (
-          <div className="flex gap-2">
-            <button onClick={onReset} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs font-medium hover:bg-white/10 transition-colors">
-              <RotateCcw className="w-3.5 h-3.5" /> Generate Another
-            </button>
-            <a href="/history" className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 border border-primary/20 text-xs font-medium text-primary hover:bg-primary/15 transition-colors">
-              View History
-            </a>
+          <div className="space-y-3">
+            <h5 className="font-bold text-xs tracking-wider uppercase text-white">Models</h5>
+            <ul className="space-y-2 text-xs text-muted-foreground">
+              <li><a href="/" className="hover:text-primary transition-all">Wan 2.2 (Free)</a></li>
+              <li><a href="/pricing" className="hover:text-primary transition-all">Veo 3.1 (Pro)</a></li>
+              <li><a href="/pricing" className="hover:text-primary transition-all">Grok Video (Pro)</a></li>
+              <li><a href="/pricing" className="hover:text-primary transition-all">Seedance 2.0 (Pro)</a></li>
+            </ul>
           </div>
-        )}
-      </div>
+          <div className="space-y-3">
+            <h5 className="font-bold text-xs tracking-wider uppercase text-white">Account</h5>
+            <ul className="space-y-2 text-xs text-muted-foreground">
+              <li><a href="/signup" className="hover:text-primary transition-all">Sign Up Free</a></li>
+              <li><a href="/login" className="hover:text-primary transition-all">Sign In</a></li>
+              <li><a href="/pricing" className="hover:text-primary transition-all">Pricing</a></li>
+              <li><a href="/dashboard" className="hover:text-primary transition-all">Dashboard</a></li>
+              <li><a href="/history" className="hover:text-primary transition-all">Video History</a></li>
+            </ul>
+          </div>
+          <div className="space-y-3">
+            <h5 className="font-bold text-xs tracking-wider uppercase text-white">Company</h5>
+            <ul className="space-y-2 text-xs text-muted-foreground">
+              <li><a href="/contact" className="hover:text-primary transition-all">Contact Support</a></li>
+              <li><a href="/terms" className="hover:text-primary transition-all">Terms of Service</a></li>
+              <li><a href="/pricing#faq" className="hover:text-primary transition-all">FAQ</a></li>
+            </ul>
+          </div>
+        </div>
+        <div className="container mx-auto px-4 mt-10 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-bold">
+          <span>&copy; 2026 VidCraft AI. All rights reserved.</span>
+          <span>Payments secured by Paystack · Naira (₦) · Made in Nigeria 🇳🇬</span>
+        </div>
+      </footer>
     </div>
   );
 }

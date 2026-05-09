@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import bcryptjs from "bcryptjs";
+import mongoose from "mongoose";
 import { User } from "../models/User";
 import { requireAuth, type AuthRequest } from "../middleware/auth";
 import { isIpRegistrationBlocked, recordIpRegistration } from "../models/RegistrationAttempt";
@@ -157,6 +158,30 @@ router.post("/change-password", requireAuth, async (req: AuthRequest, res: Respo
     res.json({ message: "Password changed successfully." });
   } catch {
     res.status(500).json({ error: "Could not change password. Please try again." });
+  }
+});
+
+router.get("/leaderboard", async (_req: Request, res: Response) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.json({ leaderboard: [] });
+  }
+  try {
+    const top = await User.find({ referralCount: { $gt: 0 } })
+      .sort({ referralCount: -1 })
+      .limit(50)
+      .select("name referralCount plan")
+      .maxTimeMS(5000);
+    res.json({
+      leaderboard: top.map((u, i) => ({
+        rank: i + 1,
+        name: u.name,
+        referralCount: u.referralCount,
+        creditsEarned: u.referralCount * 5,
+        plan: u.plan,
+      })),
+    });
+  } catch {
+    res.json({ leaderboard: [] });
   }
 });
 

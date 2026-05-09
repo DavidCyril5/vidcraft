@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Video as LucideVideo, Menu, User, Sparkles, LogOut, Coins, Crown, X, LayoutDashboard, History, Settings } from 'lucide-react';
+import { Video as LucideVideo, Menu, User, Sparkles, LogOut, Coins, Crown, X, LayoutDashboard, History, Settings, Trophy } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -47,6 +47,9 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-6">
           <a href="/" className="text-sm font-medium hover:text-primary transition-colors">Generator</a>
           <a href="/pricing" className="text-sm font-medium hover:text-primary transition-colors">Pricing</a>
+          <a href="/leaderboard" className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-1">
+            <Trophy className="w-3.5 h-3.5 text-yellow-400" />Leaderboard
+          </a>
           {user && (
             <>
               <a href="/history" className="text-sm font-medium hover:text-primary transition-colors">History</a>
@@ -91,10 +94,11 @@ export default function Navbar() {
                     </div>
                     <div className="p-2">
                       {[
-                        { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-                        { href: '/history',   icon: History,         label: 'Video History' },
-                        { href: '/settings',  icon: Settings,        label: 'Settings' },
-                        { href: '/pricing',   icon: Crown,           label: 'Upgrade Plan' },
+                        { href: '/dashboard',   icon: LayoutDashboard, label: 'Dashboard' },
+                        { href: '/history',     icon: History,         label: 'Video History' },
+                        { href: '/leaderboard', icon: Trophy,          label: 'Leaderboard' },
+                        { href: '/settings',    icon: Settings,        label: 'Settings' },
+                        { href: '/pricing',     icon: Crown,           label: 'Upgrade Plan' },
                       ].map(item => (
                         <a key={item.href} href={item.href} onClick={() => setMenuOpen(false)}
                           className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-white/10 transition-colors text-sm">
@@ -148,6 +152,7 @@ export default function Navbar() {
           {[
             { href: '/', label: 'Generator' },
             { href: '/pricing', label: 'Pricing' },
+            { href: '/leaderboard', label: '🏆 Leaderboard' },
             ...(user ? [
               { href: '/dashboard', label: 'Dashboard' },
               { href: '/history', label: 'Video History' },

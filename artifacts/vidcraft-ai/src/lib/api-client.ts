@@ -132,3 +132,10 @@ export async function getReferralInfo(): Promise<{ referralCode: string; referra
   if (!res.ok) throw new Error(data.error || 'Could not load referral info.');
   return data;
 }
+
+export async function getLeaderboard(): Promise<{ leaderboard: { rank: number; name: string; referralCount: number; creditsEarned: number; plan: string }[] }> {
+  const res = await apiFetch('/api/auth/leaderboard');
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Could not load leaderboard.');
+  return data;
+}

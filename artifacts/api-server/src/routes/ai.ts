@@ -1,10 +1,16 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
+import { exec } from "child_process";
+import { promisify } from "util";
+import { writeFile, readFile, unlink } from "fs/promises";
+import { tmpdir } from "os";
+import { join } from "path";
 import { optionalAuth, requireAuth, type AuthRequest } from "../middleware/auth";
 import { User } from "../models/User";
 import { VideoHistory } from "../models/VideoHistory";
 
 const router = Router();
+const execAsync = promisify(exec);
 
 const PAXSENIX_API_KEYS = (process.env.PAXSENIX_API_KEYS || "").split(",").map(k => k.trim()).filter(Boolean);
 const EXSAL_API_KEY = process.env.EXSAL_API_KEY || "";
@@ -15,6 +21,36 @@ function getRandomPaxsenixKey(): string {
 }
 
 function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
+
+async function removeWatermark(videoUrl: string): Promise<string> {
+  const ts = Date.now();
+  const tmpIn  = join(tmpdir(), `vc_in_${ts}.mp4`);
+  const tmpOut = join(tmpdir(), `vc_out_${ts}.mp4`);
+  try {
+    const res = await fetch(videoUrl);
+    if (!res.ok) return videoUrl;
+    const buf = Buffer.from(await res.arrayBuffer());
+    await writeFile(tmpIn, buf);
+    // Crop bottom 7% to remove the watermark strip; keep height divisible by 2
+    await execAsync(`ffmpeg -i "${tmpIn}" -vf "crop=iw:trunc(ih*0.93/2)*2:0:0" -c:a copy -y "${tmpOut}"`);
+    const outBuf = await readFile(tmpOut);
+    const blob = new Blob([outBuf], { type: "video/mp4" });
+    const form = new FormData();
+    form.append("file", blob, `vidcraft-${ts}.mp4`);
+    const upload = await fetch("https://tmpfiles.org/api/v1/upload", { method: "POST", body: form });
+    if (!upload.ok) return videoUrl;
+    const uploadData = await upload.json() as any;
+    if (uploadData.status === "success" && uploadData.data?.url) {
+      return uploadData.data.url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/");
+    }
+    return videoUrl;
+  } catch {
+    return videoUrl;
+  } finally {
+    unlink(tmpIn).catch(() => {});
+    unlink(tmpOut).catch(() => {});
+  }
+}
 
 function isQuotaError(status: number, body: any): boolean {
   if (status === 429 || status === 402) return true;
@@ -216,8 +252,9 @@ router.post("/generate-video", requireAuth, async (req: AuthRequest, res: Respon
       return;
     }
 
-    await VideoHistory.create({ userId: user._id.toString(), prompt, model, ratio, videoUrl }).catch(() => {});
-    res.json({ videoUrl });
+    const cleanUrl = await removeWatermark(videoUrl);
+    await VideoHistory.create({ userId: user._id.toString(), prompt, model, ratio, videoUrl: cleanUrl }).catch(() => {});
+    res.json({ videoUrl: cleanUrl });
   } catch {
     res.status(500).json({ error: "An unexpected error occurred. Please try again." });
   }

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -53,8 +53,34 @@ export default function GenerationForm({ onGenerateStart, onGenerateComplete, on
   const [uploadingField, setUploadingField] = useState<'imageUrl' | 'endImageUrl' | null>(null);
   const [claimingCredit, setClaimingCredit] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startFileRef = useRef<HTMLInputElement>(null);
   const endFileRef = useRef<HTMLInputElement>(null);
+
+  const startTimer = useCallback((seconds: number) => {
+    setTimeLeft(seconds);
+    timerRef.current = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev === null || prev <= 1) {
+          if (timerRef.current) clearInterval(timerRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, []);
+
+  const stopTimer = useCallback(() => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    setTimeLeft(null);
+  }, []);
+
+  const formatTimeLeft = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, '0')} remaining`;
+  };
   const { toast } = useToast();
   const { user, claimDailyWan, refreshUser } = useAuth();
 
@@ -153,6 +179,7 @@ export default function GenerationForm({ onGenerateStart, onGenerateComplete, on
       return;
     }
     setIsGenerating(true);
+    startTimer(waitMins * 60);
     onGenerateStart(values);
     try {
       const result = await generateVideo({
@@ -170,6 +197,7 @@ export default function GenerationForm({ onGenerateStart, onGenerateComplete, on
       toast({ title: 'Generation Failed', description: error.message, variant: 'destructive' });
     } finally {
       setIsGenerating(false);
+      stopTimer();
     }
   };
 
@@ -327,7 +355,7 @@ export default function GenerationForm({ onGenerateStart, onGenerateComplete, on
               <Button type="submit" className="w-full h-14 primary-gradient text-background font-bold text-base rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all"
                 disabled={isGenerating || !!uploadingField || (user.credits < creditCost)}>
                 {isGenerating
-                  ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Generating — ~{waitMins} min wait...</>
+                  ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />{timeLeft !== null && timeLeft > 0 ? `Generating — ${formatTimeLeft(timeLeft)}` : `Generating — almost done...`}</>
                   : <><Sparkles className="w-5 h-5 mr-2" />Generate Video ({creditCost} Credits)</>}
               </Button>
             )}

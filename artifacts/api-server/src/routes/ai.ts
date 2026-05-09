@@ -286,19 +286,55 @@ router.post("/generate-video", requireAuth, async (req: AuthRequest, res: Respon
       return;
     }
 
+    // Wait the model's initial processing time before polling starts
     await sleep(initialWait);
 
+    // Poll for up to 10 minutes total from request start.
+    // Paxsenix sometimes returns an HTML error page (DOCTYPE) while still
+    // processing — treat any non-JSON / non-done response as "still working"
+    // and keep polling rather than crashing or bailing out early.
+    const POLL_INTERVAL = 20000; // 20s between polls
+    const MAX_POLL_MS   = 10 * 60 * 1000; // hard cap: 10 minutes
+    const pollDeadline  = Date.now() + MAX_POLL_MS;
+
     let videoUrl: string | null = null;
-    for (let i = 0; i < 24; i++) {
-      const pollRes = await fetch(initData.task_url, { headers: { Authorization: `Bearer ${apiKey}` } });
-      if (!pollRes.ok) { await sleep(15000); continue; }
-      const pollData = await pollRes.json() as any;
-      if (pollData.status === "done" && pollData.ok) {
-        videoUrl = pollData.video_url || pollData.url;
-        break;
+    let consecutiveFails = 0;
+
+    while (Date.now() < pollDeadline) {
+      try {
+        const pollRes = await fetch(initData.task_url, { headers: { Authorization: `Bearer ${apiKey}` } });
+        const text = await pollRes.text();
+
+        // HTML error page = Paxsenix still processing, keep waiting
+        if (text.trimStart().startsWith("<!")) {
+          await sleep(POLL_INTERVAL);
+          continue;
+        }
+
+        let pollData: any;
+        try { pollData = JSON.parse(text); } catch {
+          await sleep(POLL_INTERVAL);
+          continue;
+        }
+
+        if (pollData.ok && (pollData.status === "done" || pollData.status === "completed")) {
+          videoUrl = pollData.video_url || pollData.url || pollData.videoUrl;
+          break;
+        }
+
+        // "failed" can be transient on Paxsenix — only give up after 3 in a row
+        if (pollData.status === "failed") {
+          consecutiveFails++;
+          if (consecutiveFails >= 3) break;
+        } else {
+          consecutiveFails = 0;
+        }
+
+      } catch {
+        // Network hiccup — keep going
       }
-      if (pollData.status === "failed") break;
-      await sleep(15000);
+
+      await sleep(POLL_INTERVAL);
     }
 
     if (!videoUrl) {

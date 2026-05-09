@@ -80,14 +80,35 @@ router.post("/generate-video", requireAuth, async (req: AuthRequest, res: Respon
       return;
     }
 
+    const MODEL_COSTS: Record<string, number> = {
+      "wan-2.2":      4,
+      "grok-video":   6,
+      "seedance-2.0": 8,
+      "veo-3.1":      10,
+    };
+    const MODEL_INITIAL_WAIT: Record<string, number> = {
+      "wan-2.2":      4 * 60 * 1000,
+      "grok-video":   5 * 60 * 1000,
+      "veo-3.1":      7 * 60 * 1000,
+      "seedance-2.0": 10 * 60 * 1000,
+    };
+
+    const creditCost = MODEL_COSTS[model] ?? 4;
+    const initialWait = MODEL_INITIAL_WAIT[model] ?? 5 * 60 * 1000;
+
+    if (user.credits < creditCost) {
+      res.status(402).json({ error: isPaid ? `You need ${creditCost} credits for this model. Purchase more to continue.` : `You need ${creditCost} credits for this model. Upgrade a plan to keep generating amazing videos!` });
+      return;
+    }
+
     if (!user.isAdmin) {
-      await User.findByIdAndUpdate(user._id, { $inc: { credits: -1 } });
+      await User.findByIdAndUpdate(user._id, { $inc: { credits: -creditCost } });
     }
 
     if (model === "wan-2.2") {
       if (!EXSAL_API_KEY) {
-        if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: 1 } });
-        res.status(503).json({ error: "Wan 2.2 is temporarily offline. Your credit has been refunded. Please try again later." });
+        if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: creditCost } });
+        res.status(503).json({ error: "Wan 2.2 is temporarily offline. Your credits have been refunded. Please try again later." });
         return;
       }
       let url: string;
@@ -99,18 +120,18 @@ router.post("/generate-video", requireAuth, async (req: AuthRequest, res: Respon
       }
       const response = await fetch(url);
       if (!response.ok) {
-        if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: 1 } });
-        res.status(503).json({ error: "Wan 2.2 is currently unavailable. Your credit has been refunded." });
+        if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: creditCost } });
+        res.status(503).json({ error: "Wan 2.2 is currently unavailable. Your credits have been refunded." });
         return;
       }
       const initialData = await response.json() as any;
       if (!initialData.status || !initialData.data?.pollUrl) {
-        if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: 1 } });
-        res.status(502).json({ error: "Failed to start video generation. Your credit has been refunded." });
+        if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: creditCost } });
+        res.status(502).json({ error: "Failed to start video generation. Your credits have been refunded." });
         return;
       }
       const pollUrl = initialData.data.pollUrl;
-      await sleep(4 * 60 * 1000);
+      await sleep(initialWait);
       let videoUrl = null;
       for (let i = 0; i < 24; i++) {
         const pollRes = await fetch(pollUrl);
@@ -124,8 +145,8 @@ router.post("/generate-video", requireAuth, async (req: AuthRequest, res: Respon
         await sleep(15000);
       }
       if (!videoUrl) {
-        if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: 1 } });
-        res.status(504).json({ error: "Generation is taking longer than expected. Your credit has been refunded. Please try again." });
+        if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: creditCost } });
+        res.status(504).json({ error: "Generation is taking longer than expected. Your credits have been refunded. Please try again." });
         return;
       }
       await VideoHistory.create({ userId: user._id.toString(), prompt, model, ratio, videoUrl }).catch(() => {});
@@ -134,10 +155,10 @@ router.post("/generate-video", requireAuth, async (req: AuthRequest, res: Respon
     }
 
     if (PAXSENIX_API_KEYS.length === 0) {
-      if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: 1 } });
+      if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: creditCost } });
       const msg = isVip
-        ? "Our AI servers are experiencing exceptionally high demand. Your credit has been refunded — please try again in a few minutes."
-        : "Server is at capacity. Upgrade to VIP for guaranteed priority access. Your credit has been refunded.";
+        ? "Our AI servers are experiencing exceptionally high demand. Your credits have been refunded — please try again in a few minutes."
+        : "Server is at capacity. Upgrade to VIP for guaranteed priority access. Your credits have been refunded.";
       res.status(503).json({ error: msg });
       return;
     }
@@ -156,25 +177,25 @@ router.post("/generate-video", requireAuth, async (req: AuthRequest, res: Respon
     const initData = await initRes.json() as any;
 
     if (!initRes.ok) {
-      if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: 1 } });
+      if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: creditCost } });
       if (isQuotaError(initRes.status, initData)) {
         const msg = isVip
-          ? "Our AI servers are experiencing exceptionally high demand. Your credit has been refunded — please try again shortly."
-          : "Server is busy right now. Upgrade to VIP for priority queue access. Your credit has been refunded.";
+          ? "Our AI servers are experiencing exceptionally high demand. Your credits have been refunded — please try again shortly."
+          : "Server is busy right now. Upgrade to VIP for priority queue access. Your credits have been refunded.";
         res.status(503).json({ error: msg });
         return;
       }
-      res.status(502).json({ error: "Video generation could not be started. Your credit has been refunded." });
+      res.status(502).json({ error: "Video generation could not be started. Your credits have been refunded." });
       return;
     }
 
     if (!initData.ok || !initData.task_url) {
-      if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: 1 } });
-      res.status(502).json({ error: "Generation request failed. Your credit has been refunded." });
+      if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: creditCost } });
+      res.status(502).json({ error: "Generation request failed. Your credits have been refunded." });
       return;
     }
 
-    await sleep(4 * 60 * 1000);
+    await sleep(initialWait);
 
     let videoUrl: string | null = null;
     for (let i = 0; i < 24; i++) {
@@ -190,8 +211,8 @@ router.post("/generate-video", requireAuth, async (req: AuthRequest, res: Respon
     }
 
     if (!videoUrl) {
-      if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: 1 } });
-      res.status(504).json({ error: "Generation timed out. Your credit has been refunded — please try again." });
+      if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: creditCost } });
+      res.status(504).json({ error: "Generation timed out. Your credits have been refunded — please try again." });
       return;
     }
 

@@ -29,11 +29,11 @@ interface GenerationFormProps {
   onGenerateError: () => void;
 }
 
-const MODEL_INFO: Record<string, { label: string; free: boolean }> = {
-  'wan-2.2':      { label: 'Wan 2.2 — Free',       free: true },
-  'veo-3.1':      { label: 'Veo 3.1 — Pro+',        free: false },
-  'grok-video':   { label: 'Grok Video — Pro+',      free: false },
-  'seedance-2.0': { label: 'Seedance 2.0 — Pro+',    free: false },
+const MODEL_INFO: Record<string, { label: string; free: boolean; credits: number; waitMins: number }> = {
+  'wan-2.2':      { label: 'Wan 2.2 (No Sound)',    free: true,  credits: 4,  waitMins: 4  },
+  'veo-3.1':      { label: 'Veo 3.1 — Pro+',        free: false, credits: 10, waitMins: 7  },
+  'grok-video':   { label: 'Grok Video — Pro+',      free: false, credits: 6,  waitMins: 5  },
+  'seedance-2.0': { label: 'Seedance 2.0 — Pro+',    free: false, credits: 8,  waitMins: 10 },
 };
 
 const PROMPT_TEMPLATES = [
@@ -82,6 +82,9 @@ export default function GenerationForm({ onGenerateStart, onGenerateComplete, on
   const isPaid = user?.plan !== 'free';
   const today = new Date().toISOString().slice(0, 10);
   const canClaimWan = user && user.dailyWanClaimed !== today;
+  const modelInfo = MODEL_INFO[selectedModel];
+  const creditCost = modelInfo?.credits ?? 4;
+  const waitMins = modelInfo?.waitMins ?? 5;
 
   const handleEnhancePrompt = async () => {
     const currentPrompt = form.getValues('prompt');
@@ -141,8 +144,8 @@ export default function GenerationForm({ onGenerateStart, onGenerateComplete, on
       window.location.href = '/login';
       return;
     }
-    if (user.credits <= 0) {
-      toast({ title: 'No credits', description: 'Upgrade your plan or claim your daily free credit.', variant: 'destructive' });
+    if (user.credits < creditCost) {
+      toast({ title: 'Not enough credits', description: `This model needs ${creditCost} credits. You have ${user.credits}.`, variant: 'destructive' });
       return;
     }
     if (values.model !== 'wan-2.2' && !isPaid) {
@@ -249,7 +252,9 @@ export default function GenerationForm({ onGenerateStart, onGenerateComplete, on
                     <SelectContent className="bg-popover border-white/10">
                       {Object.entries(MODEL_INFO).map(([val, info]) => (
                         <SelectItem key={val} value={val} disabled={!info.free && !isPaid}>
-                          <span className={!info.free && !isPaid ? 'text-muted-foreground' : ''}>{info.label}</span>
+                          <span className={!info.free && !isPaid ? 'text-muted-foreground' : ''}>
+                            {info.label} · {info.credits} credits · ~{info.waitMins}m
+                          </span>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -320,8 +325,10 @@ export default function GenerationForm({ onGenerateStart, onGenerateComplete, on
               </a>
             ) : (
               <Button type="submit" className="w-full h-14 primary-gradient text-background font-bold text-base rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all"
-                disabled={isGenerating || !!uploadingField || user.credits <= 0}>
-                {isGenerating ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Generating — please wait...</> : <><Sparkles className="w-5 h-5 mr-2" />Generate Video (1 Credit)</>}
+                disabled={isGenerating || !!uploadingField || (user.credits < creditCost)}>
+                {isGenerating
+                  ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Generating — ~{waitMins} min wait...</>
+                  : <><Sparkles className="w-5 h-5 mr-2" />Generate Video ({creditCost} Credits)</>}
               </Button>
             )}
           </form>

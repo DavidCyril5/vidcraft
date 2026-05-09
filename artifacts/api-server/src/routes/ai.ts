@@ -180,7 +180,7 @@ router.post("/generate-video", requireAuth, async (req: AuthRequest, res: Respon
       "veo-3.1":      10,
     };
     const MODEL_INITIAL_WAIT: Record<string, number> = {
-      "wan-2.2":      4 * 60 * 1000,
+      "wan-2.2":      1.5 * 60 * 1000,
       "grok-video":   5 * 60 * 1000,
       "veo-3.1":      7 * 60 * 1000,
       "seedance-2.0": 10 * 60 * 1000,

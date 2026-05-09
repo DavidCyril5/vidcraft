@@ -40,7 +40,7 @@ const FAQS = [
   { q: 'Which payment methods are accepted?', a: 'We use Paystack, which supports Nigerian debit/credit cards, bank transfers, and USSD. All prices are in Nigerian Naira (₦). We do not support foreign cards at this time.' },
   { q: 'Can I cancel my subscription?', a: 'Yes, contact us at support@vidcraft.ai to cancel. You\'ll keep your plan until the end of the billing period, then revert to Free. We don\'t offer refunds for partial months.' },
   { q: 'What is the difference between Wan 2.2 and the other models?', a: 'Wan 2.2 is our free model — great for text-to-video and basic image-to-video. Veo 3.1, Grok Video, and Seedance 2.0 are premium models on paid plans, offering higher quality, faster rendering, and more visual fidelity.' },
-  { q: 'How does the referral program work?', a: 'Share your referral link from the Dashboard. When a friend signs up using your link, they get 1 bonus credit and you earn 2 credits — instantly added to your account.' },
+  { q: 'How does the referral program work?', a: 'Share your referral link from the Dashboard. When a friend signs up using your link, they get 3 bonus credits (6 total instead of 3) and you earn 5 credits — instantly added to your account.' },
 ];
 
 function FAQItem({ q, a }: { q: string; a: string }) {

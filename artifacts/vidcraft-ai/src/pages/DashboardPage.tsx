@@ -54,7 +54,7 @@ export default function DashboardPage() {
   const copyReferralLink = () => {
     navigator.clipboard.writeText(referralLink).then(() => {
       setCopiedRef(true);
-      toast({ title: 'Referral link copied!', description: 'Share it to earn 2 credits per sign-up.' });
+      toast({ title: 'Referral link copied!', description: 'Share it to earn 5 credits per sign-up.' });
       setTimeout(() => setCopiedRef(false), 2000);
     });
   };
@@ -198,7 +198,7 @@ export default function DashboardPage() {
               )}
             </div>
             <p className="text-xs text-muted-foreground mb-4">
-              Earn <span className="text-white font-semibold">2 credits</span> for every friend who signs up. Your friend gets <span className="text-white font-semibold">1 bonus credit</span> too.
+              Earn <span className="text-white font-semibold">5 credits</span> for every friend who signs up. Your friend gets <span className="text-white font-semibold">3 bonus credits</span> too.
             </p>
             {referral ? (
               <div className="space-y-3">

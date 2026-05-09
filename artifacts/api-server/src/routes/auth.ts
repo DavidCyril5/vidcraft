@@ -54,9 +54,9 @@ router.post("/register", async (req: Request, res: Response) => {
     if (referralCode && typeof referralCode === "string") {
       const referrer = await User.findOne({ referralCode: referralCode.toUpperCase() });
       if (referrer && referrer._id.toString() !== user._id.toString()) {
-        await User.findByIdAndUpdate(referrer._id, { $inc: { credits: 2, referralCount: 1 } });
-        await User.findByIdAndUpdate(user._id, { referredBy: referrer._id.toString(), $inc: { credits: 1 } });
-        user.credits = 4;
+        await User.findByIdAndUpdate(referrer._id, { $inc: { credits: 5, referralCount: 1 } });
+        await User.findByIdAndUpdate(user._id, { referredBy: referrer._id.toString(), $inc: { credits: 3 } });
+        user.credits = 6;
       }
     }
 
@@ -166,7 +166,7 @@ router.get("/referral-info", requireAuth, async (req: AuthRequest, res: Response
     res.json({
       referralCode: user?.referralCode,
       referralCount: user?.referralCount || 0,
-      creditsEarned: (user?.referralCount || 0) * 2,
+      creditsEarned: (user?.referralCount || 0) * 5,
     });
   } catch {
     res.status(500).json({ error: "Could not load referral info." });

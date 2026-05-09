@@ -26,7 +26,7 @@ export default function SignupPage() {
     setLoading(true);
     try {
       await register(name, email, password, referralCode || undefined);
-      const bonus = referralCode ? 4 : 3;
+      const bonus = referralCode ? 6 : 3;
       toast({ title: 'Welcome to VidCraft AI!', description: `You have ${bonus} free credits to get started.` });
       navigate('/');
     } catch (err: any) {
@@ -51,7 +51,7 @@ export default function SignupPage() {
           </a>
           <h1 className="text-3xl font-headline font-bold text-white">Create your account</h1>
           <p className="text-muted-foreground mt-2">
-            {referralCode ? 'You were referred! Get 4 credits on signup.' : 'Get 3 free credits on signup — no card required'}
+            {referralCode ? 'You were referred! Get 6 credits on signup.' : 'Get 3 free credits on signup — no card required'}
           </p>
         </div>
 
@@ -59,7 +59,7 @@ export default function SignupPage() {
           {referralCode ? (
             <div className="flex items-center gap-2 mb-6 px-4 py-3 rounded-xl bg-green-500/10 border border-green-500/20">
               <Gift className="w-4 h-4 text-green-400 shrink-0" />
-              <span className="text-xs text-green-400 font-medium">Referral bonus! You'll get 4 credits instead of 3.</span>
+              <span className="text-xs text-green-400 font-medium">Referral bonus! You'll get 6 credits instead of 3.</span>
             </div>
           ) : (
             <div className="flex items-center gap-2 mb-6 px-4 py-3 rounded-xl bg-primary/10 border border-primary/20">

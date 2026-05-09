@@ -53,7 +53,7 @@ async function removeWatermark(videoUrl: string): Promise<string> {
 }
 
 // ---------------------------------------------------------------------------
-// freeaivideos.org — used for grok-video generation
+// freeaivideos.org — used for Wan 2.2 generation
 // ---------------------------------------------------------------------------
 const FREEVIDEO_BASE = "https://www.freeaivideos.org";
 const FREEVIDEO_HEADERS = {
@@ -198,114 +198,53 @@ router.post("/generate-video", requireAuth, async (req: AuthRequest, res: Respon
       await User.findByIdAndUpdate(user._id, { $inc: { credits: -creditCost } });
     }
 
+    // -----------------------------------------------------------------------
+    // Wan 2.2 — powered by freeaivideos.org (free, no API key needed)
+    // -----------------------------------------------------------------------
     if (model === "wan-2.2") {
-      if (!EXSAL_API_KEY) {
-        if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: creditCost } });
-        res.status(503).json({ error: "Wan 2.2 is temporarily offline. Your credits have been refunded. Please try again later." });
-        return;
-      }
-      let url: string;
-      if (imageUrl) {
-        url = `https://exsalapi.my.id/api/ai/video/wan-2.2/img2vid?image_url=${encodeURIComponent(imageUrl)}&prompt=${encodeURIComponent(prompt)}&apikey=${EXSAL_API_KEY}`;
-      } else {
-        const mappedRatio = ratio === "16:9" ? "landscape" : "portrait";
-        url = `https://exsalapi.my.id/api/ai/video/wan-2.2/txt2vid?prompt=${encodeURIComponent(prompt)}&ratio=${mappedRatio}&apikey=${EXSAL_API_KEY}`;
-      }
-      const response = await fetch(url);
-      if (!response.ok) {
-        if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: creditCost } });
-        res.status(503).json({ error: "Wan 2.2 is currently unavailable. Your credits have been refunded." });
-        return;
-      }
-
-      // The Exsal API now returns the video binary directly instead of JSON + pollUrl.
-      // We detect by Content-Type: if it's video/* or octet-stream, handle as direct video.
-      // Fall back to the old JSON polling path if the response is still JSON.
-      const contentType = response.headers.get("content-type") || "";
-      let videoUrl: string | null = null;
-
-      if (contentType.includes("video/") || contentType.includes("application/octet-stream")) {
-        // Direct binary video — upload it to tmpfiles to get a shareable URL
-        const ts = Date.now();
-        const videoBuf = Buffer.from(await response.arrayBuffer());
-        const blob = new Blob([videoBuf], { type: "video/mp4" });
-        const form = new FormData();
-        form.append("file", blob, `vidcraft-wan-${ts}.mp4`);
-        const upload = await fetch("https://tmpfiles.org/api/v1/upload", { method: "POST", body: form });
-        if (!upload.ok) {
-          if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: creditCost } });
-          res.status(502).json({ error: "Failed to process generated video. Your credits have been refunded." });
-          return;
-        }
-        const uploadData = await upload.json() as any;
-        if (uploadData.status === "success" && uploadData.data?.url) {
-          videoUrl = uploadData.data.url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/");
-        }
-      } else {
-        // Legacy JSON + polling path (kept as fallback in case the API reverts)
-        let initialData: any;
-        try {
-          initialData = await response.json();
-        } catch {
-          if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: creditCost } });
-          res.status(502).json({ error: "Unexpected response from Wan 2.2. Your credits have been refunded." });
-          return;
-        }
-        if (!initialData.status || !initialData.data?.pollUrl) {
-          if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: creditCost } });
-          res.status(502).json({ error: "Failed to start video generation. Your credits have been refunded." });
-          return;
-        }
-        const pollUrl = initialData.data.pollUrl;
-        await sleep(initialWait);
-        for (let i = 0; i < 24; i++) {
-          const pollRes = await fetch(pollUrl);
-          if (!pollRes.ok) { await sleep(15000); continue; }
-          const pollData = await pollRes.json() as any;
-          if (pollData.data?.status === "completed" && pollData.data?.url) {
-            videoUrl = pollData.data.url;
-            break;
-          }
-          if (pollData.data?.status === "failed") break;
-          await sleep(15000);
-        }
-      }
-
-      if (!videoUrl) {
-        if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: creditCost } });
-        res.status(504).json({ error: "Generation is taking longer than expected. Your credits have been refunded. Please try again." });
-        return;
-      }
-      await VideoHistory.create({ userId: user._id.toString(), prompt, model, ratio, videoUrl }).catch(() => {});
-      res.json({ videoUrl });
-      return;
-    }
-
-    // -----------------------------------------------------------------------
-    // Grok Video — powered by freeaivideos.org (free, no API key needed)
-    // -----------------------------------------------------------------------
-    if (model === "grok-video") {
       const genResult = await freevideoGenerate(prompt, imageUrl);
       if (!genResult.ok) {
         if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: creditCost } });
-        res.status(502).json({ error: "Grok Video could not be started. Your credits have been refunded. Please try again." });
+        res.status(502).json({ error: "Wan 2.2 could not be started. Your credits have been refunded. Please try again." });
         return;
       }
 
       const pollResult = await freevideoPoll(genResult.requestId, 10 * 60 * 1000);
       if (!pollResult.ok) {
         if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: creditCost } });
-        res.status(504).json({ error: "Grok Video timed out. Your credits have been refunded. Please try again." });
+        res.status(504).json({ error: "Wan 2.2 timed out. Your credits have been refunded. Please try again." });
         return;
       }
 
-      await VideoHistory.create({ userId: user._id.toString(), prompt, model, ratio, videoUrl: pollResult.videoUrl }).catch(() => {});
-      res.json({ videoUrl: pollResult.videoUrl });
+      // Proxy through tmpfiles so the browser can preview without CORS issues
+      const ts = Date.now();
+      let finalVideoUrl = pollResult.videoUrl;
+      try {
+        const vidRes = await fetch(pollResult.videoUrl, {
+          headers: { referer: "https://www.freeaivideos.org/", "user-agent": "NB Android/1.0.0" },
+        });
+        if (vidRes.ok) {
+          const vidBuf = Buffer.from(await vidRes.arrayBuffer());
+          const blob = new Blob([vidBuf], { type: "video/mp4" });
+          const form = new FormData();
+          form.append("file", blob, `vidcraft-wan-${ts}.mp4`);
+          const upload = await fetch("https://tmpfiles.org/api/v1/upload", { method: "POST", body: form });
+          if (upload.ok) {
+            const uploadData = await upload.json() as any;
+            if (uploadData.status === "success" && uploadData.data?.url) {
+              finalVideoUrl = uploadData.data.url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/");
+            }
+          }
+        }
+      } catch { /* fall back to original URL if re-hosting fails */ }
+
+      await VideoHistory.create({ userId: user._id.toString(), prompt, model, ratio, videoUrl: finalVideoUrl }).catch(() => {});
+      res.json({ videoUrl: finalVideoUrl });
       return;
     }
     // -----------------------------------------------------------------------
 
-    // Remaining models (veo-3.1, seedance-2.0) use Paxsenix
+    // Remaining models (grok-video, veo-3.1, seedance-2.0) use Paxsenix
     if (PAXSENIX_API_KEYS.length === 0) {
       if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: creditCost } });
       const msg = isVip
@@ -319,7 +258,8 @@ router.post("/generate-video", requireAuth, async (req: AuthRequest, res: Respon
     const qp = new URLSearchParams({ prompt, ratio, model });
     qp.append("type", imageUrl ? "image-to-video" : "text-to-video");
     if (imageUrl) {
-      qp.append("imageUrl", imageUrl);
+      if (model === "grok-video") qp.append("imageUrls", imageUrl);
+      else qp.append("imageUrl", imageUrl);
       if (model === "veo-3.1" && endImageUrl) qp.append("endImageUrl", endImageUrl);
     }
     const initRes = await fetch(`https://api.paxsenix.org/ai-video/${model}?${qp}`, {

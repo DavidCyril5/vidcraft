@@ -8,12 +8,14 @@ interface VideoDisplayProps {
   videoUrl?: string;
   prompt?: string;
   onReset: () => void;
+  waitMins?: number;
 }
 
-const TOTAL_SECONDS = 5 * 60;
 
-function CountdownTimer({ active }: { active: boolean }) {
+function CountdownTimer({ active, totalSeconds }: { active: boolean; totalSeconds: number }) {
   const [elapsed, setElapsed] = useState(0);
+  // Hard cap shown to user: model wait + up to 3 extra minutes buffer
+  const MAX_DISPLAY = totalSeconds + 3 * 60;
 
   useEffect(() => {
     if (!active) { setElapsed(0); return; }
@@ -21,41 +23,48 @@ function CountdownTimer({ active }: { active: boolean }) {
     return () => clearInterval(id);
   }, [active]);
 
-  const remaining = Math.max(0, TOTAL_SECONDS - elapsed);
+  const overdue = elapsed > totalSeconds;
+  const remaining = Math.max(0, totalSeconds - elapsed);
   const mins = Math.floor(remaining / 60);
   const secs = remaining % 60;
-  const pct = Math.min(100, (elapsed / TOTAL_SECONDS) * 100);
+  // Progress bar fills to 100% at totalSeconds, then pulses while overdue
+  const pct = Math.min(100, (elapsed / totalSeconds) * 100);
 
-  const phase = elapsed < 240
+  const phase = overdue
+    ? 'Almost done — taking a little longer than usual...'
+    : elapsed < totalSeconds * 0.5
     ? 'Initialising neural render...'
-    : elapsed < 300
-    ? 'Finalising your video...'
-    : 'Almost there, polishing frames...';
+    : elapsed < totalSeconds * 0.85
+    ? 'Rendering your video...'
+    : 'Finalising frames...';
 
   return (
     <div className="space-y-3 text-center w-full max-w-sm">
       <div className="relative h-2 w-full bg-white/5 rounded-full overflow-hidden">
         <div
-          className="absolute left-0 top-0 h-full primary-gradient rounded-full transition-all duration-1000"
+          className={`absolute left-0 top-0 h-full primary-gradient rounded-full transition-all duration-1000 ${overdue ? 'animate-pulse' : ''}`}
           style={{ width: `${pct}%` }}
         />
       </div>
       <div className="flex items-center justify-between text-[11px] text-muted-foreground px-1">
         <span className="animate-pulse">{phase}</span>
-        {remaining > 0 ? (
+        {!overdue ? (
           <span className="flex items-center gap-1 font-mono font-bold text-white/60">
-            <Clock className="w-3 h-3" />{mins}:{secs.toString().padStart(2, '0')}
+            <Clock className="w-3 h-3" />{mins}:{secs.toString().padStart(2, '00')}
           </span>
         ) : (
-          <span className="text-primary font-semibold">Checking result...</span>
+          <span className="text-yellow-400 font-semibold text-[10px]">⏳ Still working...</span>
         )}
       </div>
-      <p className="text-xs text-muted-foreground">This typically takes 4–6 minutes. You can leave this tab open.</p>
+      {overdue
+        ? <p className="text-xs text-yellow-400/80">Taking a bit longer — please keep this tab open. Max wait is 10 mins.</p>
+        : <p className="text-xs text-muted-foreground">Estimated ~{Math.round(totalSeconds / 60)} min. You can leave this tab open.</p>
+      }
     </div>
   );
 }
 
-export default function VideoDisplay({ status, videoUrl, prompt, onReset }: VideoDisplayProps) {
+export default function VideoDisplay({ status, videoUrl, prompt, onReset, waitMins = 5 }: VideoDisplayProps) {
   const [downloading, setDownloading] = useState(false);
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
@@ -111,10 +120,18 @@ export default function VideoDisplay({ status, videoUrl, prompt, onReset }: Vide
               </div>
             </div>
             <p className="text-lg font-headline">Crafting your masterpiece...</p>
-            <CountdownTimer active={status === 'generating'} />
+            <CountdownTimer active={status === 'generating'} totalSeconds={waitMins * 60} />
           </div>
         ) : status === 'completed' && videoUrl ? (
-          <video src={videoUrl} className="w-full h-full object-contain" controls autoPlay loop playsInline />
+          <video
+            src={
+              videoUrl.includes('freeaivideos.org')
+                ? `${import.meta.env.BASE_URL.replace(/\/$/, '')}/api/ai/proxy-video?url=${encodeURIComponent(videoUrl)}`
+                : videoUrl
+            }
+            className="w-full h-full object-contain"
+            controls autoPlay loop playsInline
+          />
         ) : status === 'error' ? (
           <div className="flex flex-col items-center gap-4 text-center p-8">
             <div className="p-4 rounded-full bg-red-500/10">

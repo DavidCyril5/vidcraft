@@ -160,26 +160,60 @@ router.post("/generate-video", requireAuth, async (req: AuthRequest, res: Respon
         res.status(503).json({ error: "Wan 2.2 is currently unavailable. Your credits have been refunded." });
         return;
       }
-      const initialData = await response.json() as any;
-      if (!initialData.status || !initialData.data?.pollUrl) {
-        if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: creditCost } });
-        res.status(502).json({ error: "Failed to start video generation. Your credits have been refunded." });
-        return;
-      }
-      const pollUrl = initialData.data.pollUrl;
-      await sleep(initialWait);
-      let videoUrl = null;
-      for (let i = 0; i < 24; i++) {
-        const pollRes = await fetch(pollUrl);
-        if (!pollRes.ok) { await sleep(15000); continue; }
-        const pollData = await pollRes.json() as any;
-        if (pollData.data?.status === "completed" && pollData.data?.url) {
-          videoUrl = pollData.data.url;
-          break;
+
+      // The Exsal API now returns the video binary directly instead of JSON + pollUrl.
+      // We detect by Content-Type: if it's video/* or octet-stream, handle as direct video.
+      // Fall back to the old JSON polling path if the response is still JSON.
+      const contentType = response.headers.get("content-type") || "";
+      let videoUrl: string | null = null;
+
+      if (contentType.includes("video/") || contentType.includes("application/octet-stream")) {
+        // Direct binary video — upload it to tmpfiles to get a shareable URL
+        const ts = Date.now();
+        const videoBuf = Buffer.from(await response.arrayBuffer());
+        const blob = new Blob([videoBuf], { type: "video/mp4" });
+        const form = new FormData();
+        form.append("file", blob, `vidcraft-wan-${ts}.mp4`);
+        const upload = await fetch("https://tmpfiles.org/api/v1/upload", { method: "POST", body: form });
+        if (!upload.ok) {
+          if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: creditCost } });
+          res.status(502).json({ error: "Failed to process generated video. Your credits have been refunded." });
+          return;
         }
-        if (pollData.data?.status === "failed") break;
-        await sleep(15000);
+        const uploadData = await upload.json() as any;
+        if (uploadData.status === "success" && uploadData.data?.url) {
+          videoUrl = uploadData.data.url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/");
+        }
+      } else {
+        // Legacy JSON + polling path (kept as fallback in case the API reverts)
+        let initialData: any;
+        try {
+          initialData = await response.json();
+        } catch {
+          if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: creditCost } });
+          res.status(502).json({ error: "Unexpected response from Wan 2.2. Your credits have been refunded." });
+          return;
+        }
+        if (!initialData.status || !initialData.data?.pollUrl) {
+          if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: creditCost } });
+          res.status(502).json({ error: "Failed to start video generation. Your credits have been refunded." });
+          return;
+        }
+        const pollUrl = initialData.data.pollUrl;
+        await sleep(initialWait);
+        for (let i = 0; i < 24; i++) {
+          const pollRes = await fetch(pollUrl);
+          if (!pollRes.ok) { await sleep(15000); continue; }
+          const pollData = await pollRes.json() as any;
+          if (pollData.data?.status === "completed" && pollData.data?.url) {
+            videoUrl = pollData.data.url;
+            break;
+          }
+          if (pollData.data?.status === "failed") break;
+          await sleep(15000);
+        }
       }
+
       if (!videoUrl) {
         if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: creditCost } });
         res.status(504).json({ error: "Generation is taking longer than expected. Your credits have been refunded. Please try again." });

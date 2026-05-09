@@ -52,6 +52,63 @@ async function removeWatermark(videoUrl: string): Promise<string> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// freeaivideos.org — used for grok-video generation
+// ---------------------------------------------------------------------------
+const FREEVIDEO_BASE = "https://www.freeaivideos.org";
+const FREEVIDEO_HEADERS = {
+  "user-agent": "NB Android/1.0.0",
+  "origin":     FREEVIDEO_BASE,
+  "referer":    FREEVIDEO_BASE + "/",
+  "accept":     "*/*",
+};
+
+async function freevideoGenerate(prompt: string, imageUrl?: string): Promise<{ ok: true; requestId: string } | { ok: false; error: string }> {
+  try {
+    const form = new FormData();
+    form.append("prompt", prompt || "");
+
+    if (imageUrl) {
+      const imgRes = await fetch(imageUrl);
+      if (!imgRes.ok) return { ok: false, error: "Could not fetch reference image." };
+      const imgBuf = Buffer.from(await imgRes.arrayBuffer());
+      const contentType = imgRes.headers.get("content-type") || "image/jpeg";
+      const blob = new Blob([imgBuf], { type: contentType });
+      // FormData.append with Blob + filename
+      form.append("initialFrame", blob, "image.jpg");
+    }
+
+    const res = await fetch(`${FREEVIDEO_BASE}/api/video_generation`, {
+      method: "POST",
+      headers: FREEVIDEO_HEADERS,
+      body: form,
+    });
+
+    const data = await res.json() as any;
+    if (!data?.request_id) return { ok: false, error: "Failed to get request ID from generator." };
+    return { ok: true, requestId: data.request_id };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "Unknown error starting generation." };
+  }
+}
+
+async function freevideoPoll(requestId: string, timeoutMs = 10 * 60 * 1000): Promise<{ ok: true; videoUrl: string } | { ok: false; error: string }> {
+  const url = `${FREEVIDEO_BASE}/api/video_generation?request_id=${encodeURIComponent(requestId)}&prompt=`;
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const res = await fetch(url, { headers: FREEVIDEO_HEADERS });
+      if (res.ok) {
+        const data = await res.json() as any;
+        if (data?.video_url) return { ok: true, videoUrl: data.video_url };
+      }
+    } catch { /* ignore transient errors, keep polling */ }
+    await sleep(5000);
+  }
+  return { ok: false, error: "Generation timed out." };
+}
+// ---------------------------------------------------------------------------
+
 function isQuotaError(status: number, body: any): boolean {
   if (status === 429 || status === 402) return true;
   const msg = (body?.message || "").toLowerCase();
@@ -224,6 +281,31 @@ router.post("/generate-video", requireAuth, async (req: AuthRequest, res: Respon
       return;
     }
 
+    // -----------------------------------------------------------------------
+    // Grok Video — powered by freeaivideos.org (free, no API key needed)
+    // -----------------------------------------------------------------------
+    if (model === "grok-video") {
+      const genResult = await freevideoGenerate(prompt, imageUrl);
+      if (!genResult.ok) {
+        if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: creditCost } });
+        res.status(502).json({ error: "Grok Video could not be started. Your credits have been refunded. Please try again." });
+        return;
+      }
+
+      const pollResult = await freevideoPoll(genResult.requestId, 10 * 60 * 1000);
+      if (!pollResult.ok) {
+        if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: creditCost } });
+        res.status(504).json({ error: "Grok Video timed out. Your credits have been refunded. Please try again." });
+        return;
+      }
+
+      await VideoHistory.create({ userId: user._id.toString(), prompt, model, ratio, videoUrl: pollResult.videoUrl }).catch(() => {});
+      res.json({ videoUrl: pollResult.videoUrl });
+      return;
+    }
+    // -----------------------------------------------------------------------
+
+    // Remaining models (veo-3.1, seedance-2.0) use Paxsenix
     if (PAXSENIX_API_KEYS.length === 0) {
       if (!user.isAdmin) await User.findByIdAndUpdate(user._id, { $inc: { credits: creditCost } });
       const msg = isVip
@@ -237,8 +319,7 @@ router.post("/generate-video", requireAuth, async (req: AuthRequest, res: Respon
     const qp = new URLSearchParams({ prompt, ratio, model });
     qp.append("type", imageUrl ? "image-to-video" : "text-to-video");
     if (imageUrl) {
-      if (model === "grok-video") qp.append("imageUrls", imageUrl);
-      else qp.append("imageUrl", imageUrl);
+      qp.append("imageUrl", imageUrl);
       if (model === "veo-3.1" && endImageUrl) qp.append("endImageUrl", endImageUrl);
     }
     const initRes = await fetch(`https://api.paxsenix.org/ai-video/${model}?${qp}`, {

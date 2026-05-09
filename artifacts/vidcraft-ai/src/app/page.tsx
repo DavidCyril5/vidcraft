@@ -13,7 +13,7 @@ export default function Home() {
   const { user } = useAuth();
 
   const MODEL_WAIT: Record<string, number> = {
-    'wan-2.2': 4, 'veo-3.1': 7, 'grok-video': 5, 'seedance-2.0': 10,
+    'wan-2.2': 2, 'veo-3.1': 7, 'grok-video': 5, 'seedance-2.0': 10,
   };
 
   const handleGenerateStart = (values: any) => {
@@ -180,7 +180,7 @@ export default function Home() {
           </div>
         </div>
         <div className="container mx-auto px-4 mt-10 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-bold">
-          <span>&copy; 2026 VidCraft AI. All rights reserved.</span>
+          <span>&copy; 2025 VidCraft AI. All rights reserved.</span>
           <span>Payments secured by Paystack · Naira (₦) · Made in Nigeria 🇳🇬</span>
         </div>
       </footer>

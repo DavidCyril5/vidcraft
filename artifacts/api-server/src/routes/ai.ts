@@ -425,4 +425,46 @@ router.post("/download-video", requireAuth, async (req: Request, res: Response) 
   }
 });
 
+// Proxies a video URL through the server so the browser can embed it without
+// CORS issues (e.g. freeaivideos.org blocks direct cross-origin <video> embeds).
+router.get("/proxy-video", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const videoUrl = req.query.url as string;
+    if (!videoUrl || !/^https?:\/\//i.test(videoUrl)) {
+      res.status(400).json({ error: "Invalid video URL." });
+      return;
+    }
+    const upstream = await fetch(videoUrl, {
+      headers: {
+        "user-agent": "NB Android/1.0.0",
+        "referer":    "https://www.freeaivideos.org/",
+      },
+    });
+    if (!upstream.ok) {
+      res.status(502).json({ error: "Could not fetch video for preview." });
+      return;
+    }
+    const contentType = upstream.headers.get("content-type") || "video/mp4";
+    const contentLength = upstream.headers.get("content-length");
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    if (contentLength) res.setHeader("Content-Length", contentLength);
+    // Stream the response directly — no buffering the whole file in memory
+    const reader = upstream.body?.getReader();
+    if (!reader) { res.status(502).end(); return; }
+    const pump = async () => {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) { res.end(); break; }
+        const ok = res.write(value);
+        if (!ok) await new Promise(r => res.once("drain", r));
+      }
+    };
+    pump().catch(() => res.end());
+  } catch {
+    res.status(500).json({ error: "Proxy failed. Please try again." });
+  }
+});
+
 export default router;
